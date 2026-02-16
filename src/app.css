@@ -145,8 +145,8 @@ h2 {
 .hand {
   position: absolute;
   left: 50%;
-  top: 14%;
-  transform-origin: 50% 86%;
+  top: 10%;
+  transform-origin: 50% 100%;
   width: 5px;
   height: 40%;
   background: var(--ink);
