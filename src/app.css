@@ -133,14 +133,14 @@ h2 {
   transform: translateX(-50%);
   width: 2px;
   height: 10px;
-  background: #998979;
-  opacity: 0.5;
+  background: #1f1b1a;
+  opacity: 0.72;
 }
 
 .tick.major::before {
   height: 16px;
   width: 3px;
-  opacity: 0.8;
+  opacity: 0.95;
 }
 
 .red-mask {
@@ -151,7 +151,7 @@ h2 {
   background: conic-gradient(
     from 0deg,
     #d43f2f 0deg,
-    var(--accent-dark) var(--red-angle),
+    #d43f2f var(--red-angle),
     transparent var(--red-angle),
     transparent 360deg
   );
