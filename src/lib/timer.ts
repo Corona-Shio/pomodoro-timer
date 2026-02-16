@@ -17,6 +17,26 @@ export const calcRedRatio = (remainingSeconds: number, totalSeconds: number): nu
   return Math.min(1, Math.max(0, remainingSeconds / totalSeconds));
 };
 
+export const calcHourCapRatio = (remainingSeconds: number): number => {
+  const HOUR_SECONDS = 60 * 60;
+  if (remainingSeconds <= 0) {
+    return 0;
+  }
+  return Math.min(1, remainingSeconds / HOUR_SECONDS);
+};
+
+export const calcMinuteHandAngle = (remainingSeconds: number): number => {
+  const HOUR_SECONDS = 60 * 60;
+  if (remainingSeconds <= 0) {
+    return 0;
+  }
+  const normalized = remainingSeconds % HOUR_SECONDS;
+  if (normalized === 0) {
+    return 360;
+  }
+  return (normalized / HOUR_SECONDS) * 360;
+};
+
 export const formatRemaining = (seconds: number): string => {
   const safe = Math.max(0, Math.floor(seconds));
   const mins = Math.floor(safe / 60)

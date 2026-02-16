@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   assignLanes,
-  calcRedRatio,
+  calcMinuteHandAngle,
   clampMinutes,
   formatRemaining,
   minutesFromStartOfDay,
@@ -102,9 +102,8 @@ function App() {
   }, [remainingSeconds, status]);
 
   const canEditSetting = status === 'idle' || status === 'done';
-  const totalSeconds = (sessionRef.current?.plannedMinutes ?? setMinutes) * 60;
-  const redRatio = calcRedRatio(remainingSeconds, totalSeconds);
-  const handAngle = 360 * redRatio;
+  const handAngle = calcMinuteHandAngle(remainingSeconds);
+  const redSectorAngle = remainingSeconds > 60 * 60 ? 360 : handAngle;
   const todayKey = toDateKey(new Date());
   const todaysLogs = useMemo(() => logs.filter((entry) => entry.dateKey === todayKey), [logs, todayKey]);
   const timeline = useMemo(() => assignLanes(todaysLogs), [todaysLogs]);
@@ -182,7 +181,7 @@ function App() {
                 />
               ))}
             </div>
-            <div className="red-mask" style={{ height: `${Math.round(redRatio * 100)}%` }} />
+            <div className="red-mask" style={{ '--red-angle': `${redSectorAngle}deg` } as CSSProperties} />
             <div className="hand" style={{ transform: `translate(-50%, 0) rotate(${handAngle}deg)` }} />
             <div className="center-dot" />
             <div className="digital">

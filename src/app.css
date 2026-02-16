@@ -130,11 +130,16 @@ h2 {
 
 .red-mask {
   position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 100%;
-  background: linear-gradient(180deg, #d43f2f 0%, var(--accent-dark) 100%);
-  transition: height 240ms linear;
+  inset: 0;
+  --red-angle: 0deg;
+  background: conic-gradient(
+    from 0deg,
+    #d43f2f 0deg,
+    var(--accent-dark) var(--red-angle),
+    transparent var(--red-angle),
+    transparent 360deg
+  );
+  transition: 240ms linear;
 }
 
 .hand {
