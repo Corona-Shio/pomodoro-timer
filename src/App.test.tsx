@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { storageKeys } from './lib/storage';
@@ -10,6 +10,7 @@ describe('App', () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.useRealTimers();
   });
 
@@ -30,5 +31,20 @@ describe('App', () => {
     const parsed = JSON.parse(raw as string) as Array<{ task: string }>;
     expect(parsed).toHaveLength(1);
     expect(parsed[0].task).toBe('テスト作業');
+  });
+
+  it('does not start when minutes is zero', () => {
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText('分'), { target: { value: '0' } });
+    const startButton = screen.getByRole('button', { name: 'タイマー開始' });
+    expect(startButton).toBeDisabled();
+
+    fireEvent.click(startButton);
+
+    const raw = localStorage.getItem(storageKeys.logs);
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw as string) as Array<{ id: string }>;
+    expect(parsed).toHaveLength(0);
   });
 });

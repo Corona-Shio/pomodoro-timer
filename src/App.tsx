@@ -117,7 +117,7 @@ function App() {
   };
 
   const onStart = (): void => {
-    if (status === 'running') {
+    if (status === 'running' || setMinutes <= 0) {
       return;
     }
 
@@ -200,7 +200,7 @@ function App() {
             <input
               id="minutes-input"
               type="number"
-              min={1}
+              min={0}
               max={180}
               step={1}
               value={setMinutes}
@@ -235,7 +235,7 @@ function App() {
             />
             <div className="action-buttons">
               {(status === 'idle' || status === 'done') && (
-                <button type="button" onClick={onStart} aria-label="タイマー開始">
+                <button type="button" onClick={onStart} disabled={setMinutes <= 0} aria-label="タイマー開始">
                   開始
                 </button>
               )}

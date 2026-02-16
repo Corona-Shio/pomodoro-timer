@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 describe('timer helpers', () => {
   it('clamps minutes into allowed range', () => {
-    expect(clampMinutes(-5)).toBe(1);
+    expect(clampMinutes(-5)).toBe(0);
     expect(clampMinutes(999)).toBe(180);
     expect(clampMinutes(24.2)).toBe(24);
   });

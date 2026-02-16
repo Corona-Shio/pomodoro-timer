@@ -1,6 +1,6 @@
 import type { TimeLog, LaneLog } from './types';
 
-export const MIN_MINUTES = 1;
+export const MIN_MINUTES = 0;
 export const MAX_MINUTES = 180;
 
 export const clampMinutes = (value: number): number => {
