@@ -177,7 +177,7 @@ function App() {
                 <i
                   key={idx}
                   className={`tick ${idx % 5 === 0 ? 'major' : ''}`}
-                  style={{ transform: `translateX(-50%) rotate(${idx * 6}deg)` }}
+                  style={{ transform: `rotate(${idx * 6}deg)` }}
                 />
               ))}
             </div>

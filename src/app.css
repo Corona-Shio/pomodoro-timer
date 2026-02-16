@@ -116,20 +116,28 @@ h2 {
 .ticks {
   position: absolute;
   inset: 0;
+  z-index: 2;
 }
 
 .tick {
   position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+}
+
+.tick::before {
+  content: '';
+  position: absolute;
   left: 50%;
   top: 4px;
-  transform-origin: 50% calc(50% - 4px);
+  transform: translateX(-50%);
   width: 2px;
   height: 10px;
   background: #998979;
   opacity: 0.5;
 }
 
-.tick.major {
+.tick.major::before {
   height: 16px;
   width: 3px;
   opacity: 0.8;
@@ -139,6 +147,7 @@ h2 {
   position: absolute;
   inset: 0;
   --red-angle: 0deg;
+  z-index: 1;
   background: conic-gradient(
     from 0deg,
     #d43f2f 0deg,
@@ -158,6 +167,7 @@ h2 {
   height: 40%;
   background: var(--ink);
   border-radius: 10px;
+  z-index: 3;
   transition: transform var(--dial-motion) linear;
 }
 
@@ -170,6 +180,7 @@ h2 {
   border-radius: 50%;
   background: #fff;
   border: 3px solid #1f1b1a;
+  z-index: 4;
   transform: translate(-50%, -50%);
 }
 
@@ -179,7 +190,7 @@ h2 {
   text-align: center;
   display: grid;
   gap: 4px;
-  z-index: 2;
+  z-index: 5;
 }
 
 .digital span {
