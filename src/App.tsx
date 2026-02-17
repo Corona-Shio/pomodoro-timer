@@ -162,8 +162,8 @@ function App() {
       <section className="timer-card">
         <header className="timer-head">
           <div>
-            <h1>Analog Pomodoro</h1>
-            <p>タイムボクシング用ワークタイマー</p>
+            <h1>Pomodoro Timer</h1>
+            <p>ポモドーロタイマー</p>
           </div>
           <strong className="clock-pill" aria-label="現在時刻">
             {clock}
@@ -258,9 +258,9 @@ function App() {
         </div>
       </section>
 
-      <section className="timeline-card" aria-label="本日のタイムボクシング">
+      <section className="timeline-card" aria-label="本日のタイムライン">
         <header className="timeline-head">
-          <h2>今日のタイムボクシング</h2>
+          <h2>今日のタイムライン</h2>
           <span>{todayKey}</span>
         </header>
 
