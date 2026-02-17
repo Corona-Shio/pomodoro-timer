@@ -6,6 +6,7 @@ import { storageKeys } from './lib/storage';
 describe('App', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-02-17T09:00:00.000Z'));
     localStorage.clear();
   });
 
@@ -54,5 +55,30 @@ describe('App', () => {
     expect(screen.getByText('00:00')).toBeInTheDocument();
     expect(screen.getByText('24:00')).toBeInTheDocument();
     expect(screen.getByText('記録がまだありません。1セッション完了するとここに表示されます。')).toBeInTheDocument();
+  });
+
+  it('records planned end time even if callbacks are delayed', async () => {
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText('分'), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'タイマー開始' }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(65_000);
+      await Promise.resolve();
+    });
+
+    const raw = localStorage.getItem(storageKeys.logs);
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw as string) as Array<{
+      startedAt: string;
+      endedAt: string;
+      actualSeconds: number;
+    }>;
+
+    expect(parsed).toHaveLength(1);
+    const diffMs = new Date(parsed[0].endedAt).getTime() - new Date(parsed[0].startedAt).getTime();
+    expect(diffMs).toBe(60_000);
+    expect(parsed[0].actualSeconds).toBe(60);
   });
 });

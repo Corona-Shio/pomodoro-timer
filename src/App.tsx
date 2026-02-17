@@ -39,6 +39,7 @@ function App() {
   const [clock, setClock] = useState(nowClock());
   const [isCompleteFlash, setIsCompleteFlash] = useState(false);
   const sessionRef = useRef<SessionMeta | null>(null);
+  const deadlineRef = useRef<number | null>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -52,15 +53,19 @@ function App() {
       return;
     }
 
+    const syncRemaining = (): void => {
+      if (deadlineRef.current === null) {
+        return;
+      }
+      const diffMs = deadlineRef.current - Date.now();
+      const next = Math.max(0, Math.ceil(diffMs / 1000));
+      setRemainingSeconds((prev) => (prev === next ? prev : next));
+    };
+
+    syncRemaining();
     const timer = window.setInterval(() => {
-      setRemainingSeconds((prev) => {
-        if (prev <= 1) {
-          window.clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+      syncRemaining();
+    }, 250);
 
     return () => window.clearInterval(timer);
   }, [status]);
@@ -77,11 +82,9 @@ function App() {
     if (status === 'running' && remainingSeconds === 0) {
       const session = sessionRef.current;
       if (session) {
-        const endedAt = new Date();
-        const actualSeconds = Math.max(
-          1,
-          Math.round((endedAt.getTime() - session.startedAt.getTime()) / 1000)
-        );
+        const endedAtMs = deadlineRef.current ?? Date.now();
+        const endedAt = new Date(endedAtMs);
+        const actualSeconds = Math.max(1, session.plannedMinutes * 60);
 
         const newLog: TimeLog = {
           id: crypto.randomUUID(),
@@ -95,6 +98,7 @@ function App() {
 
         setLogs((prev) => [newLog, ...prev]);
         sessionRef.current = null;
+        deadlineRef.current = null;
       }
       setStatus('done');
       setIsCompleteFlash(true);
@@ -132,6 +136,7 @@ function App() {
         task
       };
       setRemainingSeconds(total);
+      deadlineRef.current = now.getTime() + total * 1000;
       setIsCompleteFlash(false);
     }
 
@@ -140,18 +145,25 @@ function App() {
 
   const onPause = (): void => {
     if (status === 'running') {
+      if (deadlineRef.current !== null) {
+        const diffMs = deadlineRef.current - Date.now();
+        setRemainingSeconds(Math.max(0, Math.ceil(diffMs / 1000)));
+      }
+      deadlineRef.current = null;
       setStatus('paused');
     }
   };
 
   const onResume = (): void => {
     if (status === 'paused') {
+      deadlineRef.current = Date.now() + remainingSeconds * 1000;
       setStatus('running');
     }
   };
 
   const onReset = (): void => {
     sessionRef.current = null;
+    deadlineRef.current = null;
     setStatus('idle');
     setIsCompleteFlash(false);
     setRemainingSeconds(setMinutes * 60);
