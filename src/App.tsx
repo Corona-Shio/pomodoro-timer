@@ -3,7 +3,6 @@ import {
   assignLanes,
   calcMinuteHandAngle,
   clampMinutes,
-  formatRemaining,
   minutesFromStartOfDay,
   toDateKey,
   toLocalTime
@@ -30,6 +29,7 @@ const nowClock = (): string =>
   });
 
 function App() {
+  const dialNumbers = useMemo(() => Array.from({ length: 12 }, (_, idx) => (idx === 0 ? 60 : idx * 5)), []);
   const initialSetMinutes = useMemo(() => loadSetMinutes(), []);
   const [setMinutes, setSetMinutes] = useState(initialSetMinutes);
   const [remainingSeconds, setRemainingSeconds] = useState(initialSetMinutes * 60);
@@ -181,15 +181,16 @@ function App() {
                 />
               ))}
             </div>
+            <div className="numerals" aria-hidden="true">
+              {dialNumbers.map((value, idx) => (
+                <i key={value} className="numeral" style={{ transform: `rotate(${idx * 30}deg) translateY(-45%)` }}>
+                  <span style={{ transform: `rotate(${-idx * 30}deg)` }}>{value}</span>
+                </i>
+              ))}
+            </div>
             <div className="red-mask" style={{ '--red-angle': `${redSectorAngle}deg` } as CSSProperties} />
             <div className="hand" style={{ transform: `translate(-50%, 0) rotate(${handAngle}deg)` }} />
             <div className="center-dot" />
-            <div className="digital">
-              <span>{formatRemaining(remainingSeconds)}</span>
-              <small>
-                {status === 'done' ? '完了' : status === 'paused' ? '一時停止' : status === 'running' ? '計測中' : '待機中'}
-              </small>
-            </div>
           </div>
         </div>
 
