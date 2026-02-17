@@ -4,8 +4,7 @@ import {
   calcMinuteHandAngle,
   clampMinutes,
   minutesFromStartOfDay,
-  toDateKey,
-  toLocalTime
+  toDateKey
 } from './lib/timer';
 import {
   loadLogs,
@@ -20,8 +19,12 @@ import {
 import type { CompletionSound, TimeLog, TimerStatus } from './lib/types';
 
 const DAY_MINUTES = 24 * 60;
-const PIXELS_PER_MINUTE = 0.8;
-const TIMELINE_HEIGHT = DAY_MINUTES * PIXELS_PER_MINUTE;
+const PIXELS_PER_MINUTE = 1.2;
+const TIMELINE_EDGE_PADDING = 14;
+const TIMELINE_LABEL_GUTTER = 72;
+const TIMELINE_BODY_HEIGHT = DAY_MINUTES * PIXELS_PER_MINUTE;
+const TIMELINE_TOTAL_HEIGHT = TIMELINE_BODY_HEIGHT + TIMELINE_EDGE_PADDING * 2;
+const COMPACT_THRESHOLD_MINUTES = 30;
 
 type SessionMeta = {
   startedAt: Date;
@@ -35,6 +38,13 @@ const nowClock = (): string =>
     minute: '2-digit',
     second: '2-digit',
     hour12: false
+  });
+
+const toMeridiemTime = (iso: string): string =>
+  new Date(iso).toLocaleTimeString('ja-JP', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
   });
 
 const requestNotificationPermission = (): void => {
@@ -430,38 +440,59 @@ function App() {
           <p className="empty">記録がまだありません。1セッション完了するとここに表示されます。</p>
         )}
         <div className="timeline-shell">
-          <div className="timeline-axis" style={{ height: `${TIMELINE_HEIGHT}px` }}>
-            {Array.from({ length: 25 }).map((_, hour) => (
-              <div
-                className="hour-line"
-                key={hour}
-                style={{ top: `${(hour / 24) * 100}%` }}
-              >
-                <span>{`${hour.toString().padStart(2, '0')}:00`}</span>
-              </div>
-            ))}
-
-            {timeline.logs.map((entry) => {
-              const startMinute = minutesFromStartOfDay(entry.startedAt);
-              const endMinute = minutesFromStartOfDay(entry.endedAt);
-              const top = Math.max(0, (startMinute / DAY_MINUTES) * TIMELINE_HEIGHT);
-              const height = Math.max(12, ((endMinute - startMinute) / DAY_MINUTES) * TIMELINE_HEIGHT);
-              const width = `calc(${100 / timeline.laneCount}% - 8px)`;
-              const left = `calc(${(entry.lane * 100) / timeline.laneCount}% + 6px)`;
-              const actualMin = Math.round(entry.actualSeconds / 60);
-
-              return (
-                <article
-                  key={entry.id}
-                  className="time-block"
-                  style={{ top: `${top}px`, height: `${height}px`, width, left }}
+          <div className="timeline-axis" style={{ height: `${TIMELINE_TOTAL_HEIGHT}px` }}>
+            <div
+              className="timeline-grid"
+              data-testid="timeline-grid"
+              style={{ top: `${TIMELINE_EDGE_PADDING}px`, height: `${TIMELINE_BODY_HEIGHT}px` }}
+            >
+              {Array.from({ length: 25 }).map((_, hour) => (
+                <div
+                  className="hour-line"
+                  key={hour}
+                  style={{ top: `${(hour / 24) * 100}%` }}
                 >
-                  <strong>{entry.task}</strong>
-                  <small>{`${toLocalTime(entry.startedAt)} - ${toLocalTime(entry.endedAt)}`}</small>
-                  <small>{`計画 ${entry.plannedMinutes}分 / 実績 ${actualMin}分`}</small>
-                </article>
-              );
-            })}
+                  <span>{`${hour.toString().padStart(2, '0')}:00`}</span>
+                </div>
+              ))}
+            </div>
+
+            <div
+              className="timeline-events"
+              data-testid="timeline-events"
+              style={{
+                top: `${TIMELINE_EDGE_PADDING}px`,
+                left: `${TIMELINE_LABEL_GUTTER}px`,
+                height: `${TIMELINE_BODY_HEIGHT}px`
+              }}
+            >
+              {timeline.logs.map((entry) => {
+                const startMinute = minutesFromStartOfDay(entry.startedAt);
+                const endMinute = minutesFromStartOfDay(entry.endedAt);
+                const blockMinutes = Math.max(0, endMinute - startMinute);
+                const isCompact = blockMinutes < COMPACT_THRESHOLD_MINUTES;
+                const top = Math.max(0, (startMinute / DAY_MINUTES) * TIMELINE_BODY_HEIGHT);
+                const height = Math.max(12, (blockMinutes / DAY_MINUTES) * TIMELINE_BODY_HEIGHT);
+                const width = `calc(${100 / timeline.laneCount}% - 8px)`;
+                const left = `calc(${(entry.lane * 100) / timeline.laneCount}% + 6px)`;
+                const actualMin = Math.round(entry.actualSeconds / 60);
+                const timeRange = `${toMeridiemTime(entry.startedAt)}~${toMeridiemTime(entry.endedAt)}`;
+                const blockLabel = `${entry.task}、${timeRange}`;
+
+                return (
+                  <article
+                    key={entry.id}
+                    className={`time-block ${isCompact ? 'compact' : ''}`}
+                    style={{ top: `${top}px`, height: `${height}px`, width, left }}
+                    title={blockLabel}
+                    aria-label={blockLabel}
+                  >
+                    <strong>{blockLabel}</strong>
+                    {!isCompact && <small>{`計画 ${entry.plannedMinutes}分 / 実績 ${actualMin}分`}</small>}
+                  </article>
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>

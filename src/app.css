@@ -327,7 +327,21 @@ button.secondary {
 
 .timeline-axis {
   position: relative;
-  min-width: 520px;
+  min-width: 620px;
+}
+
+.timeline-grid,
+.timeline-events {
+  position: absolute;
+}
+
+.timeline-grid {
+  left: 0;
+  right: 0;
+}
+
+.timeline-events {
+  right: 6px;
 }
 
 .hour-line {
@@ -360,11 +374,30 @@ button.secondary {
 
 .time-block strong {
   font-size: 0.82rem;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .time-block small {
   font-size: 0.72rem;
   color: #553f38;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.time-block.compact {
+  padding: 5px 6px;
+  align-content: center;
+  gap: 0;
+}
+
+.time-block.compact small {
+  display: none;
 }
 
 @media (max-width: 740px) {
@@ -387,6 +420,6 @@ button.secondary {
   }
 
   .timeline-axis {
-    min-width: 100%;
+    min-width: 620px;
   }
 }

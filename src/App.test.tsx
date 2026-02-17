@@ -55,6 +55,8 @@ describe('App', () => {
     expect(screen.getByText('00:00')).toBeInTheDocument();
     expect(screen.getByText('24:00')).toBeInTheDocument();
     expect(screen.getByText('記録がまだありません。1セッション完了するとここに表示されます。')).toBeInTheDocument();
+    expect(screen.getByTestId('timeline-grid')).toBeInTheDocument();
+    expect(screen.getByTestId('timeline-events')).toBeInTheDocument();
   });
 
   it('records planned end time even if callbacks are delayed', async () => {
@@ -130,5 +132,23 @@ describe('App', () => {
     render(<App />);
 
     expect(screen.getByLabelText('通知音量 (105%)')).toHaveValue('105');
+  });
+
+  it('uses compact block rendering for 25 minute sessions', async () => {
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText('分'), { target: { value: '25' } });
+    fireEvent.change(screen.getByLabelText('作業内容'), { target: { value: '集中作業' } });
+    fireEvent.click(screen.getByRole('button', { name: 'タイマー開始' }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(25 * 60 * 1000 + 1_000);
+      await Promise.resolve();
+    });
+
+    const compactTaskLabel = screen.getByText(/^集中作業、/);
+    expect(compactTaskLabel).toBeInTheDocument();
+    expect(compactTaskLabel.closest('article')).toHaveClass('compact');
+    expect(screen.queryByText('計画 25分 / 実績 25分')).not.toBeInTheDocument();
   });
 });
