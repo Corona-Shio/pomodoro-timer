@@ -9,12 +9,10 @@ import {
 } from './lib/timer';
 import {
   loadLogs,
-  loadSoundRepeatCount,
   loadSetMinutes,
   loadSoundType,
   loadSoundVolume,
   saveLogs,
-  saveSoundRepeatCount,
   saveSetMinutes,
   saveSoundType,
   saveSoundVolume
@@ -63,6 +61,7 @@ const notifyCompletion = (task: string, plannedMinutes: number): void => {
 
 const clampVolume = (volume: number): number => Math.min(200, Math.max(0, Math.round(volume)));
 const clampRepeatCount = (count: number): number => Math.min(5, Math.max(1, Math.round(count)));
+const FIXED_SOUND_REPEAT_COUNT = 4;
 const isCompletionSound = (value: string): value is CompletionSound =>
   value === 'chime' || value === 'bell' || value === 'beep' || value === 'silent';
 
@@ -132,11 +131,9 @@ function App() {
   const initialSetMinutes = useMemo(() => loadSetMinutes(), []);
   const initialSoundVolume = useMemo(() => loadSoundVolume(), []);
   const initialSoundType = useMemo(() => loadSoundType(), []);
-  const initialSoundRepeatCount = useMemo(() => loadSoundRepeatCount(), []);
   const [setMinutes, setSetMinutes] = useState(initialSetMinutes);
   const [soundVolume, setSoundVolume] = useState(initialSoundVolume);
   const [soundType, setSoundType] = useState<CompletionSound>(initialSoundType);
-  const [soundRepeatCount, setSoundRepeatCount] = useState(initialSoundRepeatCount);
   const [remainingSeconds, setRemainingSeconds] = useState(initialSetMinutes * 60);
   const [status, setStatus] = useState<TimerStatus>('idle');
   const [taskInput, setTaskInput] = useState('');
@@ -188,10 +185,6 @@ function App() {
   }, [soundType]);
 
   useEffect(() => {
-    saveSoundRepeatCount(soundRepeatCount);
-  }, [soundRepeatCount]);
-
-  useEffect(() => {
     saveLogs(logs);
   }, [logs]);
 
@@ -215,14 +208,14 @@ function App() {
 
         setLogs((prev) => [newLog, ...prev]);
         notifyCompletion(session.task, session.plannedMinutes);
-        playCompletionSound(soundType, soundVolume, soundRepeatCount);
+        playCompletionSound(soundType, soundVolume, FIXED_SOUND_REPEAT_COUNT);
         sessionRef.current = null;
         deadlineRef.current = null;
       }
       setStatus('done');
       setIsCompleteFlash(true);
     }
-  }, [remainingSeconds, soundRepeatCount, soundType, soundVolume, status]);
+  }, [remainingSeconds, soundType, soundVolume, status]);
 
   const canEditSetting = status === 'idle' || status === 'done';
   const handAngle = calcMinuteHandAngle(remainingSeconds);
@@ -244,7 +237,7 @@ function App() {
   };
 
   const onTestSound = (): void => {
-    playCompletionSound(soundType, soundVolume, soundRepeatCount);
+    playCompletionSound(soundType, soundVolume, FIXED_SOUND_REPEAT_COUNT);
   };
 
   const onSoundTypeChange = (nextSoundType: string): void => {
@@ -252,10 +245,6 @@ function App() {
       return;
     }
     setSoundType(nextSoundType);
-  };
-
-  const onSoundRepeatCountChange = (nextSoundRepeatCount: number): void => {
-    setSoundRepeatCount(clampRepeatCount(nextSoundRepeatCount));
   };
 
   const onStart = (): void => {
@@ -385,21 +374,6 @@ function App() {
               value={soundVolume}
               onChange={(event) => onSoundVolumeChange(Number(event.target.value))}
             />
-            <label htmlFor="sound-repeat-count">繰り返し回数</label>
-            <select
-              id="sound-repeat-count"
-              value={soundRepeatCount}
-              onChange={(event) => onSoundRepeatCountChange(Number(event.target.value))}
-            >
-              <option value={1}>1回</option>
-              <option value={2}>2回</option>
-              <option value={3}>3回</option>
-              <option value={4}>4回</option>
-              <option value={5}>5回</option>
-            </select>
-            <button type="button" onClick={onTestSound} className="secondary" aria-label="通知音をテスト">
-              通知音をテスト
-            </button>
             <label htmlFor="sound-type">通知音タイプ</label>
             <select id="sound-type" value={soundType} onChange={(event) => onSoundTypeChange(event.target.value)}>
               <option value="chime">チャイム</option>
@@ -407,6 +381,9 @@ function App() {
               <option value="beep">ビープ</option>
               <option value="silent">無音（通知のみ）</option>
             </select>
+            <button type="button" onClick={onTestSound} className="secondary" aria-label="通知音をテスト">
+              通知音をテスト
+            </button>
           </section>
 
           <section className="panel" aria-label="セッション操作">

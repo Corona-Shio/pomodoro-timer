@@ -112,21 +112,16 @@ describe('App', () => {
     expect(screen.getByLabelText('通知音タイプ')).toHaveValue('bell');
   });
 
-  it('persists repeat count setting', () => {
-    const { unmount } = render(<App />);
-
-    fireEvent.change(screen.getByLabelText('繰り返し回数'), { target: { value: '3' } });
-
-    const raw = localStorage.getItem(storageKeys.settings);
-    expect(raw).toBeTruthy();
-    expect(JSON.parse(raw as string)).toMatchObject({
-      soundRepeatCount: 3
-    });
-
-    unmount();
+  it('places sound type selector above test button', () => {
     render(<App />);
 
-    expect(screen.getByLabelText('繰り返し回数')).toHaveValue('3');
+    expect(screen.queryByLabelText('繰り返し回数')).not.toBeInTheDocument();
+
+    const soundTypeSelect = screen.getByLabelText('通知音タイプ');
+    const testButton = screen.getByRole('button', { name: '通知音をテスト' });
+    const position = soundTypeSelect.compareDocumentPosition(testButton);
+
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('migrates legacy volume and boost settings to unified volume', () => {
