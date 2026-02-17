@@ -222,6 +222,7 @@ h2 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+  align-items: start;
 }
 
 .panel {
@@ -246,6 +247,28 @@ input {
   padding: 10px 12px;
   background: #fff;
   color: var(--ink);
+}
+
+select {
+  width: 100%;
+  border: 1px solid #bea98f;
+  border-radius: 10px;
+  font-size: 1rem;
+  padding: 10px 12px;
+  background: #fff;
+  color: var(--ink);
+}
+
+input[type='range'] {
+  padding: 0;
+  accent-color: var(--accent);
+}
+
+.panel-divider {
+  border: 0;
+  border-top: 1px dashed #d7c7b5;
+  width: 100%;
+  margin: 4px 0 2px;
 }
 
 .quick-buttons,

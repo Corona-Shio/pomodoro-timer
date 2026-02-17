@@ -7,8 +7,19 @@ import {
   toDateKey,
   toLocalTime
 } from './lib/timer';
-import { loadLogs, loadSetMinutes, saveLogs, saveSetMinutes } from './lib/storage';
-import type { TimeLog, TimerStatus } from './lib/types';
+import {
+  loadLogs,
+  loadSoundRepeatCount,
+  loadSetMinutes,
+  loadSoundType,
+  loadSoundVolume,
+  saveLogs,
+  saveSoundRepeatCount,
+  saveSetMinutes,
+  saveSoundType,
+  saveSoundVolume
+} from './lib/storage';
+import type { CompletionSound, TimeLog, TimerStatus } from './lib/types';
 
 const DAY_MINUTES = 24 * 60;
 const PIXELS_PER_MINUTE = 0.8;
@@ -28,10 +39,104 @@ const nowClock = (): string =>
     hour12: false
   });
 
+const requestNotificationPermission = (): void => {
+  if (typeof Notification === 'undefined') {
+    return;
+  }
+  if (Notification.permission !== 'default') {
+    return;
+  }
+  void Notification.requestPermission().catch(() => undefined);
+};
+
+const notifyCompletion = (task: string, plannedMinutes: number): void => {
+  if (typeof Notification === 'undefined') {
+    return;
+  }
+  if (Notification.permission !== 'granted') {
+    return;
+  }
+  new Notification('Pomodoro 完了', {
+    body: `${task} (${plannedMinutes}分) が完了しました。`
+  });
+};
+
+const clampVolume = (volume: number): number => Math.min(200, Math.max(0, Math.round(volume)));
+const clampRepeatCount = (count: number): number => Math.min(5, Math.max(1, Math.round(count)));
+const isCompletionSound = (value: string): value is CompletionSound =>
+  value === 'chime' || value === 'bell' || value === 'beep' || value === 'silent';
+
+const playCompletionSound = (soundType: CompletionSound, volume: number, repeatCount: number): void => {
+  if (soundType === 'silent') {
+    return;
+  }
+
+  const audioContextCtor =
+    window.AudioContext ??
+    (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+  if (!audioContextCtor) {
+    return;
+  }
+
+  const ctx = new audioContextCtor();
+  const startAt = ctx.currentTime;
+  const gainPeak = Math.min(0.95, 0.38 * (clampVolume(volume) / 100));
+  const repeat = clampRepeatCount(repeatCount);
+  const playNote = (freq: number, offset: number, duration: number, waveType: OscillatorType): void => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const noteStart = startAt + offset;
+    const noteEnd = noteStart + duration;
+
+    osc.type = waveType;
+    osc.frequency.setValueAtTime(freq, noteStart);
+    gain.gain.setValueAtTime(0.0001, noteStart);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, gainPeak), noteStart + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, noteEnd);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(noteStart);
+    osc.stop(noteEnd);
+  };
+
+  let totalDuration = 0.4;
+  for (let cycle = 0; cycle < repeat; cycle += 1) {
+    if (soundType === 'chime') {
+      const base = cycle * 0.5;
+      playNote(880, base, 0.14, 'sine');
+      playNote(660, base + 0.18, 0.14, 'sine');
+      totalDuration = base + 0.32;
+    } else if (soundType === 'bell') {
+      const base = cycle * 0.56;
+      playNote(1046, base, 0.12, 'triangle');
+      playNote(1318, base + 0.12, 0.12, 'triangle');
+      playNote(1568, base + 0.24, 0.12, 'triangle');
+      totalDuration = base + 0.36;
+    } else {
+      const base = cycle * 0.42;
+      playNote(880, base, 0.2, 'square');
+      totalDuration = base + 0.2;
+    }
+  }
+
+  void ctx.resume().catch(() => undefined);
+  window.setTimeout(() => {
+    void ctx.close().catch(() => undefined);
+  }, Math.ceil((totalDuration + 0.2) * 1000));
+};
+
 function App() {
   const dialNumbers = useMemo(() => Array.from({ length: 12 }, (_, idx) => (idx === 0 ? 60 : idx * 5)), []);
   const initialSetMinutes = useMemo(() => loadSetMinutes(), []);
+  const initialSoundVolume = useMemo(() => loadSoundVolume(), []);
+  const initialSoundType = useMemo(() => loadSoundType(), []);
+  const initialSoundRepeatCount = useMemo(() => loadSoundRepeatCount(), []);
   const [setMinutes, setSetMinutes] = useState(initialSetMinutes);
+  const [soundVolume, setSoundVolume] = useState(initialSoundVolume);
+  const [soundType, setSoundType] = useState<CompletionSound>(initialSoundType);
+  const [soundRepeatCount, setSoundRepeatCount] = useState(initialSoundRepeatCount);
   const [remainingSeconds, setRemainingSeconds] = useState(initialSetMinutes * 60);
   const [status, setStatus] = useState<TimerStatus>('idle');
   const [taskInput, setTaskInput] = useState('');
@@ -75,6 +180,18 @@ function App() {
   }, [setMinutes]);
 
   useEffect(() => {
+    saveSoundVolume(soundVolume);
+  }, [soundVolume]);
+
+  useEffect(() => {
+    saveSoundType(soundType);
+  }, [soundType]);
+
+  useEffect(() => {
+    saveSoundRepeatCount(soundRepeatCount);
+  }, [soundRepeatCount]);
+
+  useEffect(() => {
     saveLogs(logs);
   }, [logs]);
 
@@ -97,13 +214,15 @@ function App() {
         };
 
         setLogs((prev) => [newLog, ...prev]);
+        notifyCompletion(session.task, session.plannedMinutes);
+        playCompletionSound(soundType, soundVolume, soundRepeatCount);
         sessionRef.current = null;
         deadlineRef.current = null;
       }
       setStatus('done');
       setIsCompleteFlash(true);
     }
-  }, [remainingSeconds, status]);
+  }, [remainingSeconds, soundRepeatCount, soundType, soundVolume, status]);
 
   const canEditSetting = status === 'idle' || status === 'done';
   const handAngle = calcMinuteHandAngle(remainingSeconds);
@@ -120,10 +239,31 @@ function App() {
     }
   };
 
+  const onSoundVolumeChange = (nextVolume: number): void => {
+    setSoundVolume(clampVolume(nextVolume));
+  };
+
+  const onTestSound = (): void => {
+    playCompletionSound(soundType, soundVolume, soundRepeatCount);
+  };
+
+  const onSoundTypeChange = (nextSoundType: string): void => {
+    if (!isCompletionSound(nextSoundType)) {
+      return;
+    }
+    setSoundType(nextSoundType);
+  };
+
+  const onSoundRepeatCountChange = (nextSoundRepeatCount: number): void => {
+    setSoundRepeatCount(clampRepeatCount(nextSoundRepeatCount));
+  };
+
   const onStart = (): void => {
     if (status === 'running' || setMinutes <= 0) {
       return;
     }
+
+    requestNotificationPermission();
 
     const now = new Date();
     const task = taskInput.trim() || '無題タスク';
@@ -234,6 +374,39 @@ function App() {
                 +10
               </button>
             </div>
+            <hr className="panel-divider" />
+            <label htmlFor="sound-volume">通知音量 ({soundVolume}%)</label>
+            <input
+              id="sound-volume"
+              type="range"
+              min={0}
+              max={200}
+              step={5}
+              value={soundVolume}
+              onChange={(event) => onSoundVolumeChange(Number(event.target.value))}
+            />
+            <label htmlFor="sound-repeat-count">繰り返し回数</label>
+            <select
+              id="sound-repeat-count"
+              value={soundRepeatCount}
+              onChange={(event) => onSoundRepeatCountChange(Number(event.target.value))}
+            >
+              <option value={1}>1回</option>
+              <option value={2}>2回</option>
+              <option value={3}>3回</option>
+              <option value={4}>4回</option>
+              <option value={5}>5回</option>
+            </select>
+            <button type="button" onClick={onTestSound} className="secondary" aria-label="通知音をテスト">
+              通知音をテスト
+            </button>
+            <label htmlFor="sound-type">通知音タイプ</label>
+            <select id="sound-type" value={soundType} onChange={(event) => onSoundTypeChange(event.target.value)}>
+              <option value="chime">チャイム</option>
+              <option value="bell">ベル</option>
+              <option value="beep">ビープ</option>
+              <option value="silent">無音（通知のみ）</option>
+            </select>
           </section>
 
           <section className="panel" aria-label="セッション操作">

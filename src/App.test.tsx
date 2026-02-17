@@ -81,4 +81,59 @@ describe('App', () => {
     expect(diffMs).toBe(60_000);
     expect(parsed[0].actualSeconds).toBe(60);
   });
+
+  it('persists sound volume setting', () => {
+    const { unmount } = render(<App />);
+
+    fireEvent.change(screen.getByLabelText('通知音量 (120%)'), { target: { value: '140' } });
+
+    const raw = localStorage.getItem(storageKeys.settings);
+    expect(raw).toBeTruthy();
+    expect(JSON.parse(raw as string)).toMatchObject({ soundVolume: 140 });
+
+    unmount();
+    render(<App />);
+
+    expect(screen.getByLabelText('通知音量 (140%)')).toHaveValue('140');
+  });
+
+  it('persists sound type setting', () => {
+    const { unmount } = render(<App />);
+
+    fireEvent.change(screen.getByLabelText('通知音タイプ'), { target: { value: 'bell' } });
+
+    const raw = localStorage.getItem(storageKeys.settings);
+    expect(raw).toBeTruthy();
+    expect(JSON.parse(raw as string)).toMatchObject({ soundType: 'bell' });
+
+    unmount();
+    render(<App />);
+
+    expect(screen.getByLabelText('通知音タイプ')).toHaveValue('bell');
+  });
+
+  it('persists repeat count setting', () => {
+    const { unmount } = render(<App />);
+
+    fireEvent.change(screen.getByLabelText('繰り返し回数'), { target: { value: '3' } });
+
+    const raw = localStorage.getItem(storageKeys.settings);
+    expect(raw).toBeTruthy();
+    expect(JSON.parse(raw as string)).toMatchObject({
+      soundRepeatCount: 3
+    });
+
+    unmount();
+    render(<App />);
+
+    expect(screen.getByLabelText('繰り返し回数')).toHaveValue('3');
+  });
+
+  it('migrates legacy volume and boost settings to unified volume', () => {
+    localStorage.setItem(storageKeys.settings, JSON.stringify({ soundVolume: 70, soundBoost: 150 }));
+
+    render(<App />);
+
+    expect(screen.getByLabelText('通知音量 (105%)')).toHaveValue('105');
+  });
 });

@@ -1,4 +1,5 @@
 export type TimerStatus = 'idle' | 'running' | 'paused' | 'done';
+export type CompletionSound = 'chime' | 'bell' | 'beep' | 'silent';
 
 export type TimeLog = {
   id: string;
