@@ -264,45 +264,44 @@ function App() {
           <span>{todayKey}</span>
         </header>
 
-        {timeline.logs.length === 0 ? (
+        {timeline.logs.length === 0 && (
           <p className="empty">記録がまだありません。1セッション完了するとここに表示されます。</p>
-        ) : (
-          <div className="timeline-shell">
-            <div className="timeline-axis" style={{ height: `${TIMELINE_HEIGHT}px` }}>
-              {Array.from({ length: 25 }).map((_, hour) => (
-                <div
-                  className="hour-line"
-                  key={hour}
-                  style={{ top: `${(hour / 24) * 100}%` }}
-                >
-                  <span>{`${hour.toString().padStart(2, '0')}:00`}</span>
-                </div>
-              ))}
-
-              {timeline.logs.map((entry) => {
-                const startMinute = minutesFromStartOfDay(entry.startedAt);
-                const endMinute = minutesFromStartOfDay(entry.endedAt);
-                const top = Math.max(0, (startMinute / DAY_MINUTES) * TIMELINE_HEIGHT);
-                const height = Math.max(12, ((endMinute - startMinute) / DAY_MINUTES) * TIMELINE_HEIGHT);
-                const width = `calc(${100 / timeline.laneCount}% - 8px)`;
-                const left = `calc(${(entry.lane * 100) / timeline.laneCount}% + 6px)`;
-                const actualMin = Math.round(entry.actualSeconds / 60);
-
-                return (
-                  <article
-                    key={entry.id}
-                    className="time-block"
-                    style={{ top: `${top}px`, height: `${height}px`, width, left }}
-                  >
-                    <strong>{entry.task}</strong>
-                    <small>{`${toLocalTime(entry.startedAt)} - ${toLocalTime(entry.endedAt)}`}</small>
-                    <small>{`計画 ${entry.plannedMinutes}分 / 実績 ${actualMin}分`}</small>
-                  </article>
-                );
-              })}
-            </div>
-          </div>
         )}
+        <div className="timeline-shell">
+          <div className="timeline-axis" style={{ height: `${TIMELINE_HEIGHT}px` }}>
+            {Array.from({ length: 25 }).map((_, hour) => (
+              <div
+                className="hour-line"
+                key={hour}
+                style={{ top: `${(hour / 24) * 100}%` }}
+              >
+                <span>{`${hour.toString().padStart(2, '0')}:00`}</span>
+              </div>
+            ))}
+
+            {timeline.logs.map((entry) => {
+              const startMinute = minutesFromStartOfDay(entry.startedAt);
+              const endMinute = minutesFromStartOfDay(entry.endedAt);
+              const top = Math.max(0, (startMinute / DAY_MINUTES) * TIMELINE_HEIGHT);
+              const height = Math.max(12, ((endMinute - startMinute) / DAY_MINUTES) * TIMELINE_HEIGHT);
+              const width = `calc(${100 / timeline.laneCount}% - 8px)`;
+              const left = `calc(${(entry.lane * 100) / timeline.laneCount}% + 6px)`;
+              const actualMin = Math.round(entry.actualSeconds / 60);
+
+              return (
+                <article
+                  key={entry.id}
+                  className="time-block"
+                  style={{ top: `${top}px`, height: `${height}px`, width, left }}
+                >
+                  <strong>{entry.task}</strong>
+                  <small>{`${toLocalTime(entry.startedAt)} - ${toLocalTime(entry.endedAt)}`}</small>
+                  <small>{`計画 ${entry.plannedMinutes}分 / 実績 ${actualMin}分`}</small>
+                </article>
+              );
+            })}
+          </div>
+        </div>
       </section>
     </main>
   );

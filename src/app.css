@@ -298,6 +298,7 @@ button.secondary {
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow-x: auto;
+  overflow-y: hidden;
   background: #fff;
 }
 

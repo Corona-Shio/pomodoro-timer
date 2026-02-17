@@ -47,4 +47,12 @@ describe('App', () => {
     const parsed = JSON.parse(raw as string) as Array<{ id: string }>;
     expect(parsed).toHaveLength(0);
   });
+
+  it('renders timeline axis even when no logs exist', () => {
+    render(<App />);
+
+    expect(screen.getByText('00:00')).toBeInTheDocument();
+    expect(screen.getByText('24:00')).toBeInTheDocument();
+    expect(screen.getByText('記録がまだありません。1セッション完了するとここに表示されます。')).toBeInTheDocument();
+  });
 });
