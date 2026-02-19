@@ -49,6 +49,78 @@ describe('App', () => {
     expect(parsed).toHaveLength(0);
   });
 
+  it('shows complete button only while running or paused', () => {
+    render(<App />);
+
+    expect(screen.queryByRole('button', { name: '完了' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'タイマー開始' }));
+    expect(screen.getByRole('button', { name: '完了' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '一時停止' }));
+    expect(screen.getByRole('button', { name: '完了' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '完了' }));
+    expect(screen.queryByRole('button', { name: '完了' })).not.toBeInTheDocument();
+  });
+
+  it('saves one log when completed manually while running', async () => {
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText('分'), { target: { value: '10' } });
+    fireEvent.change(screen.getByLabelText('作業内容'), { target: { value: '手動完了テスト' } });
+    fireEvent.click(screen.getByRole('button', { name: 'タイマー開始' }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(30_000);
+      await Promise.resolve();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '完了' }));
+
+    const raw = localStorage.getItem(storageKeys.logs);
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw as string) as Array<{ task: string; actualSeconds: number }>;
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].task).toBe('手動完了テスト');
+    expect(parsed[0].actualSeconds).toBe(30);
+  });
+
+  it('saves one log when completed manually while paused', () => {
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText('分'), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'タイマー開始' }));
+    fireEvent.click(screen.getByRole('button', { name: '一時停止' }));
+    fireEvent.click(screen.getByRole('button', { name: '完了' }));
+
+    const raw = localStorage.getItem(storageKeys.logs);
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw as string) as Array<{ actualSeconds: number }>;
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].actualSeconds).toBeGreaterThanOrEqual(1);
+  });
+
+  it('toggles main controls across start pause and resume states', () => {
+    render(<App />);
+
+    expect(screen.getByRole('button', { name: 'タイマー開始' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '一時停止' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '再開' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'タイマー開始' }));
+    expect(screen.getByRole('button', { name: '一時停止' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '再開' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '一時停止' }));
+    expect(screen.queryByRole('button', { name: '一時停止' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '再開' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '再開' }));
+    expect(screen.getByRole('button', { name: '一時停止' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '再開' })).not.toBeInTheDocument();
+  });
+
   it('renders timeline axis even when no logs exist', () => {
     render(<App />);
 

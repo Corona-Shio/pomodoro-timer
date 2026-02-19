@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import {
   assignLanes,
   calcMinuteHandAngle,
@@ -149,7 +149,6 @@ function App() {
   const [taskInput, setTaskInput] = useState('');
   const [logs, setLogs] = useState<TimeLog[]>(() => loadLogs());
   const [clock, setClock] = useState(nowClock());
-  const [isCompleteFlash, setIsCompleteFlash] = useState(false);
   const sessionRef = useRef<SessionMeta | null>(null);
   const deadlineRef = useRef<number | null>(null);
 
@@ -198,34 +197,46 @@ function App() {
     saveLogs(logs);
   }, [logs]);
 
-  useEffect(() => {
-    if (status === 'running' && remainingSeconds === 0) {
+  const completeSession = useCallback(
+    (endedAtMs: number, actualSeconds: number, withNotification: boolean): void => {
       const session = sessionRef.current;
-      if (session) {
-        const endedAtMs = deadlineRef.current ?? Date.now();
-        const endedAt = new Date(endedAtMs);
-        const actualSeconds = Math.max(1, session.plannedMinutes * 60);
+      if (!session) {
+        return;
+      }
 
-        const newLog: TimeLog = {
-          id: crypto.randomUUID(),
-          task: session.task,
-          plannedMinutes: session.plannedMinutes,
-          actualSeconds,
-          startedAt: session.startedAt.toISOString(),
-          endedAt: endedAt.toISOString(),
-          dateKey: toDateKey(session.startedAt)
-        };
+      const endedAt = new Date(endedAtMs);
+      const plannedSeconds = session.plannedMinutes * 60;
+      const safeActualSeconds = Math.max(1, Math.min(plannedSeconds, Math.round(actualSeconds)));
 
-        setLogs((prev) => [newLog, ...prev]);
+      const newLog: TimeLog = {
+        id: crypto.randomUUID(),
+        task: session.task,
+        plannedMinutes: session.plannedMinutes,
+        actualSeconds: safeActualSeconds,
+        startedAt: session.startedAt.toISOString(),
+        endedAt: endedAt.toISOString(),
+        dateKey: toDateKey(session.startedAt)
+      };
+
+      setLogs((prev) => [newLog, ...prev]);
+      if (withNotification) {
         notifyCompletion(session.task, session.plannedMinutes);
         playCompletionSound(soundType, soundVolume, FIXED_SOUND_REPEAT_COUNT);
-        sessionRef.current = null;
-        deadlineRef.current = null;
       }
+      sessionRef.current = null;
+      deadlineRef.current = null;
+    },
+    [soundType, soundVolume]
+  );
+
+  useEffect(() => {
+    if (status === 'running' && remainingSeconds === 0) {
+      const endedAtMs = deadlineRef.current ?? Date.now();
+      const plannedSeconds = (sessionRef.current?.plannedMinutes ?? 0) * 60;
+      completeSession(endedAtMs, plannedSeconds, true);
       setStatus('done');
-      setIsCompleteFlash(true);
     }
-  }, [remainingSeconds, soundType, soundVolume, status]);
+  }, [completeSession, remainingSeconds, status]);
 
   const canEditSetting = status === 'idle' || status === 'done';
   const handAngle = calcMinuteHandAngle(remainingSeconds);
@@ -276,7 +287,6 @@ function App() {
       };
       setRemainingSeconds(total);
       deadlineRef.current = now.getTime() + total * 1000;
-      setIsCompleteFlash(false);
     }
 
     setStatus('running');
@@ -304,8 +314,23 @@ function App() {
     sessionRef.current = null;
     deadlineRef.current = null;
     setStatus('idle');
-    setIsCompleteFlash(false);
     setRemainingSeconds(setMinutes * 60);
+  };
+
+  const onComplete = (): void => {
+    if (status !== 'running' && status !== 'paused') {
+      return;
+    }
+
+    const session = sessionRef.current;
+    if (!session) {
+      return;
+    }
+
+    const totalSeconds = session.plannedMinutes * 60;
+    const elapsedSeconds = totalSeconds - remainingSeconds;
+    completeSession(Date.now(), elapsedSeconds, false);
+    setStatus('done');
   };
 
   return (
@@ -321,7 +346,7 @@ function App() {
           </strong>
         </header>
 
-        <div className={`dial-wrap ${status === 'done' && isCompleteFlash ? 'done' : ''}`}>
+        <div className="dial-wrap">
           <div className="dial" role="img" aria-label="アナログタイマー盤">
             <div className="ticks" aria-hidden="true">
               {Array.from({ length: 60 }).map((_, idx) => (
@@ -408,21 +433,32 @@ function App() {
             />
             <div className="action-buttons">
               {(status === 'idle' || status === 'done') && (
-                <button type="button" onClick={onStart} disabled={setMinutes <= 0} aria-label="タイマー開始">
-                  開始
+                <button
+                  type="button"
+                  onClick={onStart}
+                  disabled={setMinutes <= 0}
+                  className="primary action-main action-main-full"
+                  aria-label="タイマー開始"
+                >
+                  スタート
                 </button>
               )}
               {status === 'running' && (
-                <button type="button" onClick={onPause} aria-label="一時停止">
+                <button type="button" onClick={onPause} className="primary action-main" aria-label="一時停止">
                   一時停止
                 </button>
               )}
               {status === 'paused' && (
-                <button type="button" onClick={onResume} aria-label="再開">
+                <button type="button" onClick={onResume} className="primary action-main" aria-label="再開">
                   再開
                 </button>
               )}
-              <button type="button" onClick={onReset} className="secondary" aria-label="リセット">
+              {(status === 'running' || status === 'paused') && (
+                <button type="button" onClick={onComplete} className="complete" aria-label="完了">
+                  完了
+                </button>
+              )}
+              <button type="button" onClick={onReset} className="secondary action-reset" aria-label="リセット">
                 リセット
               </button>
             </div>

@@ -89,21 +89,6 @@ h2 {
   border-radius: 34px;
 }
 
-.dial-wrap.done .dial {
-  border-color: var(--ok);
-  animation: pulse 900ms ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    box-shadow: inset 0 0 0 1px rgb(31 122 69 / 30%), 0 0 0 0 rgb(31 122 69 / 0%);
-  }
-  50% {
-    box-shadow: inset 0 0 0 1px rgb(31 122 69 / 45%), 0 0 0 12px rgb(31 122 69 / 0%);
-  }
-}
-
 .dial {
   position: relative;
   width: 100%;
@@ -285,7 +270,8 @@ input[type='range'] {
 button {
   border: none;
   border-radius: 12px;
-  padding: 10px 8px;
+  padding: 11px 10px;
+  min-height: 44px;
   font-size: 0.92rem;
   font-weight: 700;
   color: #fff;
@@ -304,6 +290,25 @@ button:disabled {
 
 button.secondary {
   background: #8f7f72;
+}
+
+button.primary {
+  background: linear-gradient(160deg, var(--accent) 0%, #ca3f33 100%);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+button.complete {
+  background: linear-gradient(160deg, #d9801e 0%, #bf5d17 100%);
+}
+
+.action-main {
+  min-height: 50px;
+}
+
+.action-main-full,
+.action-reset {
+  grid-column: 1 / -1;
 }
 
 .timeline-head span {
@@ -421,5 +426,9 @@ button.secondary {
 
   .timeline-axis {
     min-width: 620px;
+  }
+
+  .action-main {
+    min-height: 46px;
   }
 }
