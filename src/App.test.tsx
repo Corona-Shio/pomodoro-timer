@@ -34,6 +34,20 @@ describe('App', () => {
     expect(parsed[0].task).toBe('テスト作業');
   });
 
+  it('highlights timer card when timer is done', async () => {
+    const { container } = render(<App />);
+
+    fireEvent.change(screen.getByLabelText('分'), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'タイマー開始' }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(61_000);
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector('.timer-card')).toHaveClass('is-done');
+  });
+
   it('does not start when minutes is zero', () => {
     render(<App />);
 

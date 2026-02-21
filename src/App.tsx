@@ -466,7 +466,7 @@ function App() {
 
   return (
     <main className="app-shell">
-      <section className="timer-card">
+      <section className={`timer-card ${status === 'done' ? 'is-done' : ''}`}>
         <header className="timer-head">
           <div>
             <h1>Pomodoro Timer</h1>

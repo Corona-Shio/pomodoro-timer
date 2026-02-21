@@ -57,6 +57,16 @@ h2 {
   padding: 20px;
 }
 
+.timer-card {
+  transition: background-color 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+}
+
+.timer-card.is-done {
+  background: color-mix(in srgb, #d6ffbf 74%, #ffffff 26%);
+  border-color: #8bcf6c;
+  box-shadow: 0 16px 36px rgb(5 10 14 / 28%), 0 0 0 3px rgb(114 210 88 / 26%);
+}
+
 .timer-head,
 .timeline-head {
   display: flex;
@@ -101,6 +111,7 @@ h2 {
     0 18px 34px rgb(11 18 24 / 40%);
   overflow: hidden;
   background: linear-gradient(160deg, #fffefb 0%, #f4ece0 100%);
+  transition: background-color 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
 }
 
 .ticks {
@@ -125,6 +136,7 @@ h2 {
   height: 10px;
   background: #201b1a;
   opacity: 0.78;
+  transition: background-color 220ms ease;
 }
 
 .tick.major::before {
@@ -175,6 +187,7 @@ h2 {
   text-align: center;
   color: rgb(35 31 29 / 88%);
   text-shadow: 0 1px 0 rgb(255 255 255 / 55%);
+  transition: color 220ms ease, text-shadow 220ms ease;
 }
 
 .hand {
@@ -187,7 +200,7 @@ h2 {
   background: var(--ink);
   border-radius: 10px;
   z-index: 5;
-  transition: transform var(--dial-motion) linear;
+  transition: transform var(--dial-motion) linear, background-color 220ms ease;
 }
 
 .center-dot {
@@ -201,6 +214,7 @@ h2 {
   border: 3px solid #1f1b1a;
   z-index: 6;
   transform: translate(-50%, -50%);
+  transition: background-color 220ms ease, border-color 220ms ease;
 }
 
 .controls-grid {
