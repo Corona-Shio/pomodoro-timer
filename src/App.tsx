@@ -3,6 +3,7 @@ import {
   assignLanes,
   calcMinuteHandAngle,
   clampMinutes,
+  formatRemaining,
   minutesFromStartOfDay,
   toDateKey
 } from './lib/timer';
@@ -31,6 +32,8 @@ type SessionMeta = {
   plannedMinutes: number;
   task: string;
 };
+
+type TimerMode = 'work' | 'break';
 
 const nowClock = (): string =>
   new Date().toLocaleTimeString('ja-JP', {
@@ -76,6 +79,8 @@ const calcDurationMinutes = (startedAt: string, endedAt: string): number => {
   }
   return clampDurationMinutes((endMs - startMs) / 60000);
 };
+
+const toBreakSeconds = (plannedMinutes: number): number => Math.max(1, Math.round(plannedMinutes * 60 * 0.2));
 
 const requestNotificationPermission = (): void => {
   if (typeof Notification === 'undefined') {
@@ -178,6 +183,8 @@ function App() {
   const [soundType, setSoundType] = useState<CompletionSound>(initialSoundType);
   const [remainingSeconds, setRemainingSeconds] = useState(initialSetMinutes * 60);
   const [status, setStatus] = useState<TimerStatus>('idle');
+  const [mode, setMode] = useState<TimerMode>('work');
+  const [breakSuggestionSeconds, setBreakSuggestionSeconds] = useState(5 * 60);
   const [taskInput, setTaskInput] = useState('');
   const [logs, setLogs] = useState<TimeLog[]>(() => sortLogsByEndTime(loadLogs()));
   const [clock, setClock] = useState(nowClock());
@@ -234,7 +241,23 @@ function App() {
     saveLogs(logs);
   }, [logs]);
 
-  const completeSession = useCallback(
+  const switchToBreak = useCallback((plannedMinutes: number): void => {
+    const breakSeconds = toBreakSeconds(plannedMinutes);
+    setMode('break');
+    setStatus('idle');
+    setBreakSuggestionSeconds(breakSeconds);
+    setRemainingSeconds(breakSeconds);
+    deadlineRef.current = null;
+  }, []);
+
+  const switchToWork = useCallback((): void => {
+    setMode('work');
+    setStatus('idle');
+    setRemainingSeconds(setMinutes * 60);
+    deadlineRef.current = null;
+  }, [setMinutes]);
+
+  const completeWorkSession = useCallback(
     (endedAtMs: number, actualSeconds: number, withNotification: boolean): void => {
       const session = sessionRef.current;
       if (!session) {
@@ -262,25 +285,33 @@ function App() {
       }
       sessionRef.current = null;
       deadlineRef.current = null;
+      switchToBreak(session.plannedMinutes);
     },
-    [soundType, soundVolume]
+    [soundType, soundVolume, switchToBreak]
   );
 
   useEffect(() => {
-    if (status === 'running' && remainingSeconds === 0) {
+    if (status !== 'running' || remainingSeconds !== 0) {
+      return;
+    }
+
+    if (mode === 'work') {
       const endedAtMs = deadlineRef.current ?? Date.now();
       const plannedSeconds = (sessionRef.current?.plannedMinutes ?? 0) * 60;
-      completeSession(endedAtMs, plannedSeconds, true);
-      setStatus('done');
+      completeWorkSession(endedAtMs, plannedSeconds, true);
+      return;
     }
-  }, [completeSession, remainingSeconds, status]);
 
-  const canEditSetting = status === 'idle' || status === 'done';
+    switchToWork();
+  }, [completeWorkSession, mode, remainingSeconds, status, switchToWork]);
+
+  const canEditSetting = mode === 'work' && (status === 'idle' || status === 'done');
   const handAngle = calcMinuteHandAngle(remainingSeconds);
   const redSectorAngle = remainingSeconds > 60 * 60 ? 360 : handAngle;
   const todayKey = toDateKey(new Date());
   const todaysLogs = useMemo(() => logs.filter((entry) => entry.dateKey === todayKey), [logs, todayKey]);
   const timeline = useMemo(() => assignLanes(todaysLogs), [todaysLogs]);
+  const isBreakMode = mode === 'break';
 
   const applyMinutes = (nextMinutes: number): void => {
     const clamped = clampMinutes(nextMinutes);
@@ -306,7 +337,22 @@ function App() {
   };
 
   const onStart = (): void => {
-    if (status === 'running' || setMinutes <= 0) {
+    if (status === 'running') {
+      return;
+    }
+
+    if (mode === 'break') {
+      if (remainingSeconds <= 0) {
+        return;
+      }
+      if (status === 'idle' || status === 'done') {
+        deadlineRef.current = Date.now() + remainingSeconds * 1000;
+      }
+      setStatus('running');
+      return;
+    }
+
+    if (setMinutes <= 0) {
       return;
     }
 
@@ -350,12 +396,21 @@ function App() {
   const onReset = (): void => {
     sessionRef.current = null;
     deadlineRef.current = null;
+    setMode('work');
     setStatus('idle');
     setRemainingSeconds(setMinutes * 60);
   };
 
+  const onSkipBreak = (): void => {
+    switchToWork();
+  };
+
   const onComplete = (): void => {
     if (status !== 'running' && status !== 'paused') {
+      return;
+    }
+
+    if (mode !== 'work') {
       return;
     }
 
@@ -366,8 +421,7 @@ function App() {
 
     const totalSeconds = session.plannedMinutes * 60;
     const elapsedSeconds = totalSeconds - remainingSeconds;
-    completeSession(Date.now(), elapsedSeconds, false);
-    setStatus('done');
+    completeWorkSession(Date.now(), elapsedSeconds, false);
   };
 
   const onStartEditingLog = (log: TimeLog): void => {
@@ -465,12 +519,12 @@ function App() {
   };
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${isBreakMode ? 'is-break-mode' : ''}`}>
       <section className={`timer-card ${status === 'done' ? 'is-done' : ''}`}>
         <header className="timer-head">
           <div>
             <h1>Pomodoro Timer</h1>
-            <p>ポモドーロタイマー</p>
+            <p>{mode === 'work' ? 'ポモドーロタイマー' : '休憩タイマー'}</p>
           </div>
           <strong className="clock-pill" aria-label="現在時刻">
             {clock}
@@ -553,7 +607,7 @@ function App() {
           </section>
 
           <section className="panel" aria-label="セッション操作">
-            <h2>セッション</h2>
+            <h2>{mode === 'work' ? 'セッション' : '休憩'}</h2>
             <label htmlFor="task-input">作業内容</label>
             <input
               id="task-input"
@@ -561,13 +615,17 @@ function App() {
               placeholder="例: 企画書の下書き"
               value={taskInput}
               onChange={(event) => setTaskInput(event.target.value)}
+              disabled={mode !== 'work'}
             />
+            {mode === 'break' && (
+              <p className="break-hint">休憩時間: {formatRemaining(breakSuggestionSeconds)}（設定時間の20%）</p>
+            )}
             <div className="action-buttons">
               {(status === 'idle' || status === 'done') && (
                 <button
                   type="button"
                   onClick={onStart}
-                  disabled={setMinutes <= 0}
+                  disabled={mode === 'work' && setMinutes <= 0}
                   className="primary action-main action-main-full"
                   aria-label="タイマー開始"
                 >
@@ -584,14 +642,21 @@ function App() {
                   再開
                 </button>
               )}
-              {(status === 'running' || status === 'paused') && (
+              {mode === 'work' && (status === 'running' || status === 'paused') && (
                 <button type="button" onClick={onComplete} className="complete" aria-label="完了">
                   完了
                 </button>
               )}
-              <button type="button" onClick={onReset} className="secondary action-reset" aria-label="リセット">
-                リセット
-              </button>
+              {mode === 'break' && (status === 'running' || status === 'paused') && (
+                <button type="button" onClick={onSkipBreak} className="complete" aria-label="スキップ">
+                  スキップ
+                </button>
+              )}
+              {mode === 'work' && (
+                <button type="button" onClick={onReset} className="secondary action-reset" aria-label="リセット">
+                  リセット
+                </button>
+              )}
             </div>
           </section>
         </div>

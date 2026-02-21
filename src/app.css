@@ -48,6 +48,20 @@ h2 {
   gap: 18px;
 }
 
+.app-shell.is-break-mode .timer-card {
+  background: color-mix(in srgb, #dcf7dd 82%, #ffffff 18%);
+  border-color: #7dc083;
+}
+
+.app-shell.is-break-mode .dial {
+  background: linear-gradient(160deg, #f5fff4 0%, #e0f4dc 100%);
+  border-color: #2f5f39;
+}
+
+.app-shell.is-break-mode .center-dot {
+  border-color: #2f5f39;
+}
+
 .timer-card,
 .timeline-card {
   background: color-mix(in srgb, var(--panel) 85%, #ffffff 15%);
@@ -160,6 +174,16 @@ h2 {
     transparent 360deg
   );
   transition: --red-angle var(--dial-motion) linear;
+}
+
+.app-shell.is-break-mode .red-mask {
+  background: conic-gradient(
+    from 0deg,
+    #2f9d57 0deg,
+    #2f9d57 var(--red-angle),
+    transparent var(--red-angle),
+    transparent 360deg
+  );
 }
 
 .numerals {
@@ -323,6 +347,13 @@ button.complete {
 .action-main-full,
 .action-reset {
   grid-column: 1 / -1;
+}
+
+.break-hint {
+  margin: 0;
+  color: #2f5f39;
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .timeline-head span {

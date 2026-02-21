@@ -34,8 +34,8 @@ describe('App', () => {
     expect(parsed[0].task).toBe('テスト作業');
   });
 
-  it('highlights timer card when timer is done', async () => {
-    const { container } = render(<App />);
+  it('switches to break timer when work timer completes', async () => {
+    render(<App />);
 
     fireEvent.change(screen.getByLabelText('分'), { target: { value: '1' } });
     fireEvent.click(screen.getByRole('button', { name: 'タイマー開始' }));
@@ -45,7 +45,8 @@ describe('App', () => {
       await Promise.resolve();
     });
 
-    expect(container.querySelector('.timer-card')).toHaveClass('is-done');
+    expect(screen.getByText('休憩タイマー')).toBeInTheDocument();
+    expect(screen.getByText('休憩時間: 00:12（設定時間の20%）')).toBeInTheDocument();
   });
 
   it('does not start when minutes is zero', () => {
@@ -133,6 +134,51 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: '再開' }));
     expect(screen.getByRole('button', { name: '一時停止' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '再開' })).not.toBeInTheDocument();
+  });
+
+  it('offers start pause resume and skip controls in break timer', async () => {
+    const { container } = render(<App />);
+
+    fireEvent.change(screen.getByLabelText('分'), { target: { value: '1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'タイマー開始' }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(61_000);
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('button', { name: 'タイマー開始' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '完了' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'タイマー開始' }));
+
+    expect(container.querySelector('.app-shell')).toHaveClass('is-break-mode');
+    expect(screen.getByRole('button', { name: '一時停止' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'スキップ' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '一時停止' }));
+    expect(container.querySelector('.app-shell')).toHaveClass('is-break-mode');
+    expect(screen.getByRole('button', { name: '再開' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'スキップ' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'スキップ' }));
+    expect(screen.getByText('ポモドーロタイマー')).toBeInTheDocument();
+    expect(screen.queryByText('休憩タイマー')).not.toBeInTheDocument();
+  });
+
+  it('suggests break duration as 20 percent of configured time', async () => {
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText('分'), { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: 'タイマー開始' }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(30_000);
+      await Promise.resolve();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '完了' }));
+
+    expect(screen.getByText('休憩時間: 02:00（設定時間の20%）')).toBeInTheDocument();
   });
 
   it('renders timeline axis even when no logs exist', () => {
