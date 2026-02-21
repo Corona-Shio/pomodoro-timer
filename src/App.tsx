@@ -47,6 +47,36 @@ const toMeridiemTime = (iso: string): string =>
     hour12: true
   });
 
+const toDateTime = (iso: string): string =>
+  new Date(iso).toLocaleString('ja-JP', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+
+const toDateTimeInputValue = (value: string | Date): string => {
+  const date = typeof value === 'string' ? new Date(value) : value;
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
+  const hour = date.getHours().toString().padStart(2, '0');
+  const minute = date.getMinutes().toString().padStart(2, '0');
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+};
+
+const clampDurationMinutes = (minutes: number): number => Math.max(1, Math.round(minutes));
+const calcDurationMinutes = (startedAt: string, endedAt: string): number => {
+  const startMs = new Date(startedAt).getTime();
+  const endMs = new Date(endedAt).getTime();
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+    return 1;
+  }
+  return clampDurationMinutes((endMs - startMs) / 60000);
+};
+
 const requestNotificationPermission = (): void => {
   if (typeof Notification === 'undefined') {
     return;
@@ -72,6 +102,8 @@ const notifyCompletion = (task: string, plannedMinutes: number): void => {
 const clampVolume = (volume: number): number => Math.min(200, Math.max(0, Math.round(volume)));
 const clampRepeatCount = (count: number): number => Math.min(5, Math.max(1, Math.round(count)));
 const FIXED_SOUND_REPEAT_COUNT = 4;
+const sortLogsByEndTime = (entries: TimeLog[]): TimeLog[] =>
+  [...entries].sort((a, b) => new Date(a.endedAt).getTime() - new Date(b.endedAt).getTime());
 const isCompletionSound = (value: string): value is CompletionSound =>
   value === 'chime' || value === 'bell' || value === 'beep' || value === 'silent';
 
@@ -147,8 +179,13 @@ function App() {
   const [remainingSeconds, setRemainingSeconds] = useState(initialSetMinutes * 60);
   const [status, setStatus] = useState<TimerStatus>('idle');
   const [taskInput, setTaskInput] = useState('');
-  const [logs, setLogs] = useState<TimeLog[]>(() => loadLogs());
+  const [logs, setLogs] = useState<TimeLog[]>(() => sortLogsByEndTime(loadLogs()));
   const [clock, setClock] = useState(nowClock());
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [editTask, setEditTask] = useState('');
+  const [editStartedAtInput, setEditStartedAtInput] = useState('');
+  const [editEndedAtInput, setEditEndedAtInput] = useState('');
+  const [editDurationMinutes, setEditDurationMinutes] = useState(25);
   const sessionRef = useRef<SessionMeta | null>(null);
   const deadlineRef = useRef<number | null>(null);
 
@@ -218,7 +255,7 @@ function App() {
         dateKey: toDateKey(session.startedAt)
       };
 
-      setLogs((prev) => [newLog, ...prev]);
+      setLogs((prev) => [...prev, newLog]);
       if (withNotification) {
         notifyCompletion(session.task, session.plannedMinutes);
         playCompletionSound(soundType, soundVolume, FIXED_SOUND_REPEAT_COUNT);
@@ -331,6 +368,100 @@ function App() {
     const elapsedSeconds = totalSeconds - remainingSeconds;
     completeSession(Date.now(), elapsedSeconds, false);
     setStatus('done');
+  };
+
+  const onStartEditingLog = (log: TimeLog): void => {
+    setEditingLogId(log.id);
+    setEditTask(log.task);
+    setEditStartedAtInput(toDateTimeInputValue(log.startedAt));
+    setEditEndedAtInput(toDateTimeInputValue(log.endedAt));
+    setEditDurationMinutes(calcDurationMinutes(log.startedAt, log.endedAt));
+  };
+
+  const onCancelEditingLog = (): void => {
+    setEditingLogId(null);
+  };
+
+  const onSaveLog = (): void => {
+    if (!editingLogId) {
+      return;
+    }
+    const nextTask = editTask.trim() || '無題タスク';
+
+    setLogs((prev) =>
+      prev.map((log) => {
+        if (log.id !== editingLogId) {
+          return log;
+        }
+        const originalStartMs = new Date(log.startedAt).getTime();
+        const originalEndMs = new Date(log.endedAt).getTime();
+        const parsedStartMs = new Date(editStartedAtInput).getTime();
+        const parsedEndedAtMs = new Date(editEndedAtInput).getTime();
+        const safeDurationMinutes = clampDurationMinutes(editDurationMinutes);
+        const nextEndedAtMs = Number.isFinite(parsedEndedAtMs)
+          ? parsedEndedAtMs
+          : Number.isFinite(originalEndMs)
+            ? originalEndMs
+            : originalStartMs + safeDurationMinutes * 60_000;
+        const draftStartedAtMs = Number.isFinite(parsedStartMs) ? parsedStartMs : originalStartMs;
+        const nextStartedAtMs = Math.min(draftStartedAtMs, nextEndedAtMs - 60_000);
+        const nextDurationMinutes = clampDurationMinutes((nextEndedAtMs - nextStartedAtMs) / 60_000);
+        return {
+          ...log,
+          task: nextTask,
+          startedAt: new Date(nextStartedAtMs).toISOString(),
+          dateKey: toDateKey(new Date(nextStartedAtMs)),
+          actualSeconds: nextDurationMinutes * 60,
+          endedAt: new Date(nextEndedAtMs).toISOString()
+        };
+      })
+    );
+    setEditingLogId(null);
+  };
+
+  const onDeleteLog = (id: string): void => {
+    if (!window.confirm('この完了タスクを削除しますか？')) {
+      return;
+    }
+    setLogs((prev) => prev.filter((log) => log.id !== id));
+    if (editingLogId === id) {
+      setEditingLogId(null);
+    }
+  };
+
+  const onEditStartedAtChange = (value: string): void => {
+    setEditStartedAtInput(value);
+    const startMs = new Date(value).getTime();
+    const endMs = new Date(editEndedAtInput).getTime();
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+      return;
+    }
+    const safeStartMs = Math.min(startMs, endMs - 60_000);
+    if (safeStartMs !== startMs) {
+      setEditStartedAtInput(toDateTimeInputValue(new Date(safeStartMs)));
+    }
+    setEditDurationMinutes(clampDurationMinutes((endMs - safeStartMs) / 60_000));
+  };
+
+  const onEditEndedAtChange = (value: string): void => {
+    setEditEndedAtInput(value);
+    const startMs = new Date(editStartedAtInput).getTime();
+    const endMs = new Date(value).getTime();
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+      return;
+    }
+    setEditDurationMinutes(clampDurationMinutes((endMs - startMs) / 60_000));
+  };
+
+  const onEditDurationChange = (nextDuration: number): void => {
+    const startMs = new Date(editStartedAtInput).getTime();
+    const safeDurationMinutes = clampDurationMinutes(nextDuration);
+    setEditDurationMinutes(safeDurationMinutes);
+    if (!Number.isFinite(startMs)) {
+      return;
+    }
+    const nextEndedAtMs = startMs + safeDurationMinutes * 60_000;
+    setEditEndedAtInput(toDateTimeInputValue(new Date(nextEndedAtMs)));
   };
 
   return (
@@ -511,7 +642,6 @@ function App() {
                 const height = Math.max(12, (blockMinutes / DAY_MINUTES) * TIMELINE_BODY_HEIGHT);
                 const width = `calc(${100 / timeline.laneCount}% - 8px)`;
                 const left = `calc(${(entry.lane * 100) / timeline.laneCount}% + 6px)`;
-                const actualMin = Math.round(entry.actualSeconds / 60);
                 const timeRange = `${toMeridiemTime(entry.startedAt)}~${toMeridiemTime(entry.endedAt)}`;
                 const blockLabel = `${entry.task}、${timeRange}`;
 
@@ -524,13 +654,116 @@ function App() {
                     aria-label={blockLabel}
                   >
                     <strong>{blockLabel}</strong>
-                    {!isCompact && <small>{`計画 ${entry.plannedMinutes}分 / 実績 ${actualMin}分`}</small>}
                   </article>
                 );
               })}
             </div>
           </div>
         </div>
+
+        <section className="history-shell" aria-label="完了タスク履歴">
+          <header className="history-head">
+            <h2>完了タスク履歴</h2>
+            <span>新しい完了タスクは一番下に追加されます</span>
+          </header>
+          {logs.length === 0 && <p className="empty">完了履歴はまだありません。</p>}
+          {logs.length > 0 && (
+            <div className="history-table-wrap">
+              <table className="history-table">
+                <thead>
+                  <tr>
+                    <th scope="col" className="history-col-task">タスク</th>
+                    <th scope="col" className="history-col-start">開始時間</th>
+                    <th scope="col" className="history-col-end">終了時間</th>
+                    <th scope="col" className="history-col-duration">作業時間</th>
+                    <th scope="col" className="history-col-actions">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.map((log) => {
+                    const isEditing = editingLogId === log.id;
+                    return (
+                      <tr key={log.id}>
+                        <td className="history-col-task">
+                          {isEditing ? (
+                            <input
+                              aria-label={`タスク名編集-${log.id}`}
+                              value={editTask}
+                              onChange={(event) => setEditTask(event.target.value)}
+                            />
+                          ) : (
+                            log.task
+                          )}
+                        </td>
+                        <td className="history-col-start">
+                          {isEditing ? (
+                            <input
+                              type="datetime-local"
+                              aria-label={`開始時間編集-${log.id}`}
+                              value={editStartedAtInput}
+                              onChange={(event) => onEditStartedAtChange(event.target.value)}
+                            />
+                          ) : (
+                            toDateTime(log.startedAt)
+                          )}
+                        </td>
+                        <td className="history-col-end">
+                          {isEditing ? (
+                            <input
+                              type="datetime-local"
+                              aria-label={`終了時間編集-${log.id}`}
+                              value={editEndedAtInput}
+                              onChange={(event) => onEditEndedAtChange(event.target.value)}
+                            />
+                          ) : (
+                            toDateTime(log.endedAt)
+                          )}
+                        </td>
+                        <td className="history-col-duration">
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              min={1}
+                              max={1440}
+                              aria-label={`作業時間編集-${log.id}`}
+                              value={editDurationMinutes}
+                              onChange={(event) => onEditDurationChange(Number(event.target.value))}
+                            />
+                          ) : (
+                            `${calcDurationMinutes(log.startedAt, log.endedAt)}分`
+                          )}
+                        </td>
+                        <td className="history-col-actions">
+                          <div className="history-actions">
+                            {isEditing ? (
+                              <>
+                                <button type="button" onClick={onSaveLog}>
+                                  保存
+                                </button>
+                                <button type="button" className="secondary" onClick={onCancelEditingLog}>
+                                  キャンセル
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button type="button" onClick={() => onStartEditingLog(log)}>
+                                  編集
+                                </button>
+                                <button type="button" className="secondary" onClick={() => onDeleteLog(log.id)}>
+                                  削除
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </section>
     </main>
   );

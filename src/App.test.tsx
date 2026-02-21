@@ -223,4 +223,183 @@ describe('App', () => {
     expect(compactTaskLabel.closest('article')).toHaveClass('compact');
     expect(screen.queryByText('計画 25分 / 実績 25分')).not.toBeInTheDocument();
   });
+
+  it('appends newly completed task to the bottom of history', async () => {
+    localStorage.setItem(
+      storageKeys.logs,
+      JSON.stringify([
+        {
+          id: 'old',
+          task: '既存タスク',
+          plannedMinutes: 10,
+          actualSeconds: 600,
+          startedAt: '2026-02-16T09:00:00.000Z',
+          endedAt: '2026-02-16T09:10:00.000Z',
+          dateKey: '2026-02-16'
+        }
+      ])
+    );
+
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText('分'), { target: { value: '1' } });
+    fireEvent.change(screen.getByLabelText('作業内容'), { target: { value: '新規タスク' } });
+    fireEvent.click(screen.getByRole('button', { name: 'タイマー開始' }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(61_000);
+      await Promise.resolve();
+    });
+
+    const parsed = JSON.parse(localStorage.getItem(storageKeys.logs) as string) as Array<{ task: string }>;
+    expect(parsed).toHaveLength(2);
+    expect(parsed[0].task).toBe('既存タスク');
+    expect(parsed[1].task).toBe('新規タスク');
+  });
+
+  it('updates and deletes completed tasks from history table', () => {
+    localStorage.setItem(
+      storageKeys.logs,
+      JSON.stringify([
+        {
+          id: 'edit-target',
+          task: '編集前',
+          plannedMinutes: 20,
+          actualSeconds: 1200,
+          startedAt: '2026-02-17T09:00:00.000Z',
+          endedAt: '2026-02-17T09:20:00.000Z',
+          dateKey: '2026-02-17'
+        }
+      ])
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: '編集' }));
+    fireEvent.change(screen.getByLabelText('タスク名編集-edit-target'), { target: { value: '編集後' } });
+    fireEvent.change(screen.getByLabelText('作業時間編集-edit-target'), { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存' }));
+
+    let parsed = JSON.parse(localStorage.getItem(storageKeys.logs) as string) as Array<{
+      task: string;
+      actualSeconds: number;
+      endedAt: string;
+    }>;
+    expect(parsed[0].task).toBe('編集後');
+    expect(parsed[0].actualSeconds).toBe(600);
+    expect(parsed[0].endedAt).toBe('2026-02-17T09:10:00.000Z');
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fireEvent.click(screen.getByRole('button', { name: '削除' }));
+    expect(confirmSpy).toHaveBeenCalled();
+    confirmSpy.mockRestore();
+
+    parsed = JSON.parse(localStorage.getItem(storageKeys.logs) as string) as Array<{ id: string }>;
+    expect(parsed).toHaveLength(0);
+  });
+
+  it('does not delete task when delete confirmation is canceled', () => {
+    localStorage.setItem(
+      storageKeys.logs,
+      JSON.stringify([
+        {
+          id: 'delete-cancel',
+          task: '削除キャンセル',
+          plannedMinutes: 20,
+          actualSeconds: 1200,
+          startedAt: '2026-02-17T09:00:00.000Z',
+          endedAt: '2026-02-17T09:20:00.000Z',
+          dateKey: '2026-02-17'
+        }
+      ])
+    );
+
+    render(<App />);
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    fireEvent.click(screen.getByRole('button', { name: '削除' }));
+    expect(confirmSpy).toHaveBeenCalled();
+    confirmSpy.mockRestore();
+
+    const parsed = JSON.parse(localStorage.getItem(storageKeys.logs) as string) as Array<{ id: string }>;
+    expect(parsed).toHaveLength(1);
+  });
+
+  it('keeps end time and duration synced while editing history', () => {
+    localStorage.setItem(
+      storageKeys.logs,
+      JSON.stringify([
+        {
+          id: 'sync-target',
+          task: '連動テスト',
+          plannedMinutes: 20,
+          actualSeconds: 1200,
+          startedAt: '2026-02-17T09:00:00.000Z',
+          endedAt: '2026-02-17T09:20:00.000Z',
+          dateKey: '2026-02-17'
+        }
+      ])
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: '編集' }));
+
+    const durationInput = screen.getByLabelText('作業時間編集-sync-target');
+    fireEvent.change(durationInput, { target: { value: '30' } });
+    const formatLocalDateTime = (date: Date): string => {
+      const year = date.getFullYear();
+      const month = `${date.getMonth() + 1}`.padStart(2, '0');
+      const day = `${date.getDate()}`.padStart(2, '0');
+      const hours = `${date.getHours()}`.padStart(2, '0');
+      const minutes = `${date.getMinutes()}`.padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    };
+    const expectedAfterDurationEdit = formatLocalDateTime(new Date('2026-02-17T09:30:00.000Z'));
+    expect(screen.getByLabelText('終了時間編集-sync-target')).toHaveValue(expectedAfterDurationEdit);
+
+    const expectedAfterEndEdit = formatLocalDateTime(new Date('2026-02-17T09:45:00.000Z'));
+    fireEvent.change(screen.getByLabelText('終了時間編集-sync-target'), { target: { value: expectedAfterEndEdit } });
+    expect(screen.getByLabelText('作業時間編集-sync-target')).toHaveValue(45);
+  });
+
+  it('changes duration while keeping end time fixed when start time is edited', () => {
+    localStorage.setItem(
+      storageKeys.logs,
+      JSON.stringify([
+        {
+          id: 'start-edit-target',
+          task: '開始編集テスト',
+          plannedMinutes: 20,
+          actualSeconds: 1200,
+          startedAt: '2026-02-17T09:00:00.000Z',
+          endedAt: '2026-02-17T09:20:00.000Z',
+          dateKey: '2026-02-17'
+        }
+      ])
+    );
+
+    render(<App />);
+
+    fireEvent.click(screen.getByRole('button', { name: '編集' }));
+
+    const formatLocalDateTime = (date: Date): string => {
+      const year = date.getFullYear();
+      const month = `${date.getMonth() + 1}`.padStart(2, '0');
+      const day = `${date.getDate()}`.padStart(2, '0');
+      const hours = `${date.getHours()}`.padStart(2, '0');
+      const minutes = `${date.getMinutes()}`.padStart(2, '0');
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    };
+
+    const endInput = screen.getByLabelText('終了時間編集-start-edit-target');
+    const expectedEnd = formatLocalDateTime(new Date('2026-02-17T09:20:00.000Z'));
+    expect(endInput).toHaveValue(expectedEnd);
+
+    const expectedStart = formatLocalDateTime(new Date('2026-02-17T09:10:00.000Z'));
+    fireEvent.change(screen.getByLabelText('開始時間編集-start-edit-target'), { target: { value: expectedStart } });
+
+    expect(screen.getByLabelText('終了時間編集-start-edit-target')).toHaveValue(expectedEnd);
+    expect(screen.getByLabelText('作業時間編集-start-edit-target')).toHaveValue(10);
+  });
 });
