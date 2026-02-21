@@ -462,4 +462,42 @@ describe('App', () => {
     expect(screen.getByLabelText('終了時間編集-start-edit-target')).toHaveValue(expectedEnd);
     expect(screen.getByLabelText('作業時間編集-start-edit-target')).toHaveValue(10);
   });
+
+  it('shows service title in initial state and countdown title during active work/break', async () => {
+    const serviceTitle = 'Analog Pomodoro Timer';
+    document.title = serviceTitle;
+    render(<App />);
+
+    expect(document.title).toBe(serviceTitle);
+
+    fireEvent.change(screen.getByLabelText('分'), { target: { value: '1' } });
+    expect(document.title).toBe(serviceTitle);
+
+    fireEvent.click(screen.getByRole('button', { name: 'タイマー開始' }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(1_000);
+      await Promise.resolve();
+    });
+
+    expect(document.title).toBe('00:59 work');
+    fireEvent.click(screen.getByRole('button', { name: '一時停止' }));
+    expect(document.title).toBe('00:59 work');
+    fireEvent.click(screen.getByRole('button', { name: '再開' }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+      await Promise.resolve();
+    });
+
+    expect(document.title).toBe('00:12 break');
+
+    fireEvent.click(screen.getByRole('button', { name: 'タイマー開始' }));
+    await act(async () => {
+      vi.advanceTimersByTime(13_000);
+      await Promise.resolve();
+    });
+
+    expect(document.title).toBe(serviceTitle);
+  });
 });

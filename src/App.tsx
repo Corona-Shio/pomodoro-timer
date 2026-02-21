@@ -174,6 +174,7 @@ const playCompletionSound = (soundType: CompletionSound, volume: number, repeatC
 };
 
 function App() {
+  const defaultTitleRef = useRef<string>(document.title);
   const dialNumbers = useMemo(() => Array.from({ length: 12 }, (_, idx) => (idx === 0 ? 60 : idx * 5)), []);
   const initialSetMinutes = useMemo(() => loadSetMinutes(), []);
   const initialSoundVolume = useMemo(() => loadSoundVolume(), []);
@@ -240,6 +241,19 @@ function App() {
   useEffect(() => {
     saveLogs(logs);
   }, [logs]);
+
+  useEffect(() => {
+    const shouldShowCountdownTitle = mode === 'break' || (mode === 'work' && status !== 'idle' && status !== 'done');
+    document.title = shouldShowCountdownTitle
+      ? `${formatRemaining(remainingSeconds)} ${mode}`
+      : defaultTitleRef.current;
+  }, [mode, remainingSeconds, status]);
+
+  useEffect(() => {
+    return () => {
+      document.title = defaultTitleRef.current;
+    };
+  }, []);
 
   const switchToBreak = useCallback((plannedMinutes: number): void => {
     const breakSeconds = toBreakSeconds(plannedMinutes);
